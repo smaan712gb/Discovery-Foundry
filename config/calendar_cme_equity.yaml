@@ -1,0 +1,135 @@
+# CME Globex equity-index (NQ) trading calendar, all times America/New_York.
+#
+# Entered by hand from NYSE holiday schedules and CME holiday notices. It has NOT been checked
+# against every CME notice (see TODO.md). The data build flags any bar that contradicts this file
+# (OUTSIDE bars on a "closed" date, bars after an early halt), so errors here show up in the data
+# report instead of passing silently.
+#
+# kind:
+#   closed      - no Globex session for this trading date at all
+#   holiday     - NYSE closed, no RTH; Globex trades an abbreviated session to globex_close
+#   early_close - RTH ends at rth_close; Globex halts at globex_close
+name: cme_equity_index
+covers_from: 2018-01-01
+covers_to: 2026-12-31
+defaults:
+  holiday_globex_close: "13:00"
+  early_close_rth_close: "13:00"
+  early_close_globex_close: "13:15"
+entries:
+  # 2018
+  - {date: 2018-01-01, kind: closed, note: "New Year's Day"}
+  - {date: 2018-01-15, kind: holiday, note: "Martin Luther King Jr. Day"}
+  - {date: 2018-02-19, kind: holiday, note: "Presidents Day"}
+  - {date: 2018-03-30, kind: closed, note: "Good Friday"}
+  - {date: 2018-05-28, kind: holiday, note: "Memorial Day"}
+  - {date: 2018-07-03, kind: early_close, note: "Independence Day eve"}
+  - {date: 2018-07-04, kind: holiday, note: "Independence Day"}
+  - {date: 2018-09-03, kind: holiday, note: "Labor Day"}
+  - {date: 2018-11-22, kind: holiday, note: "Thanksgiving"}
+  - {date: 2018-11-23, kind: early_close, note: "Day after Thanksgiving"}
+  - {date: 2018-12-05, kind: holiday, note: "National Day of Mourning (G.H.W. Bush); verify halt time"}
+  - {date: 2018-12-24, kind: early_close, note: "Christmas Eve"}
+  - {date: 2018-12-25, kind: closed, note: "Christmas"}
+  # 2019
+  - {date: 2019-01-01, kind: closed, note: "New Year's Day"}
+  - {date: 2019-01-21, kind: holiday, note: "Martin Luther King Jr. Day"}
+  - {date: 2019-02-18, kind: holiday, note: "Presidents Day"}
+  - {date: 2019-04-19, kind: closed, note: "Good Friday"}
+  - {date: 2019-05-27, kind: holiday, note: "Memorial Day"}
+  - {date: 2019-07-03, kind: early_close, note: "Independence Day eve"}
+  - {date: 2019-07-04, kind: holiday, note: "Independence Day"}
+  - {date: 2019-09-02, kind: holiday, note: "Labor Day"}
+  - {date: 2019-11-28, kind: holiday, note: "Thanksgiving"}
+  - {date: 2019-11-29, kind: early_close, note: "Day after Thanksgiving"}
+  - {date: 2019-12-24, kind: early_close, note: "Christmas Eve"}
+  - {date: 2019-12-25, kind: closed, note: "Christmas"}
+  # 2020
+  - {date: 2020-01-01, kind: closed, note: "New Year's Day"}
+  - {date: 2020-01-20, kind: holiday, note: "Martin Luther King Jr. Day"}
+  - {date: 2020-02-17, kind: holiday, note: "Presidents Day"}
+  - {date: 2020-04-10, kind: closed, note: "Good Friday"}
+  - {date: 2020-05-25, kind: holiday, note: "Memorial Day"}
+  - {date: 2020-07-03, kind: holiday, note: "Independence Day (observed)"}
+  - {date: 2020-09-07, kind: holiday, note: "Labor Day"}
+  - {date: 2020-11-26, kind: holiday, note: "Thanksgiving"}
+  - {date: 2020-11-27, kind: early_close, note: "Day after Thanksgiving"}
+  - {date: 2020-12-24, kind: early_close, note: "Christmas Eve"}
+  - {date: 2020-12-25, kind: closed, note: "Christmas"}
+  # 2021
+  - {date: 2021-01-01, kind: closed, note: "New Year's Day"}
+  - {date: 2021-01-18, kind: holiday, note: "Martin Luther King Jr. Day"}
+  - {date: 2021-02-15, kind: holiday, note: "Presidents Day"}
+  - {date: 2021-04-02, kind: holiday, globex_close: "09:15", note: "Good Friday with payrolls release; verify halt time"}
+  - {date: 2021-05-31, kind: holiday, note: "Memorial Day"}
+  - {date: 2021-07-05, kind: holiday, note: "Independence Day (observed)"}
+  - {date: 2021-09-06, kind: holiday, note: "Labor Day"}
+  - {date: 2021-11-25, kind: holiday, note: "Thanksgiving"}
+  - {date: 2021-11-26, kind: early_close, note: "Day after Thanksgiving"}
+  - {date: 2021-12-24, kind: closed, note: "Christmas (observed)"}
+  # 2022
+  - {date: 2022-01-17, kind: holiday, note: "Martin Luther King Jr. Day"}
+  - {date: 2022-02-21, kind: holiday, note: "Presidents Day"}
+  - {date: 2022-04-15, kind: closed, note: "Good Friday"}
+  - {date: 2022-05-30, kind: holiday, note: "Memorial Day"}
+  - {date: 2022-06-20, kind: holiday, note: "Juneteenth (observed)"}
+  - {date: 2022-07-04, kind: holiday, note: "Independence Day"}
+  - {date: 2022-09-05, kind: holiday, note: "Labor Day"}
+  - {date: 2022-11-24, kind: holiday, note: "Thanksgiving"}
+  - {date: 2022-11-25, kind: early_close, note: "Day after Thanksgiving"}
+  - {date: 2022-12-26, kind: closed, note: "Christmas (observed); verify"}
+  # 2023
+  - {date: 2023-01-02, kind: closed, note: "New Year's Day (observed); verify"}
+  - {date: 2023-01-16, kind: holiday, note: "Martin Luther King Jr. Day"}
+  - {date: 2023-02-20, kind: holiday, note: "Presidents Day"}
+  - {date: 2023-04-07, kind: holiday, globex_close: "09:15", note: "Good Friday with payrolls release; verify halt time"}
+  - {date: 2023-05-29, kind: holiday, note: "Memorial Day"}
+  - {date: 2023-06-19, kind: holiday, note: "Juneteenth"}
+  - {date: 2023-07-03, kind: early_close, note: "Independence Day eve"}
+  - {date: 2023-07-04, kind: holiday, note: "Independence Day"}
+  - {date: 2023-09-04, kind: holiday, note: "Labor Day"}
+  - {date: 2023-11-23, kind: holiday, note: "Thanksgiving"}
+  - {date: 2023-11-24, kind: early_close, note: "Day after Thanksgiving"}
+  - {date: 2023-12-25, kind: closed, note: "Christmas"}
+  # 2024
+  - {date: 2024-01-01, kind: closed, note: "New Year's Day"}
+  - {date: 2024-01-15, kind: holiday, note: "Martin Luther King Jr. Day"}
+  - {date: 2024-02-19, kind: holiday, note: "Presidents Day"}
+  - {date: 2024-03-29, kind: closed, note: "Good Friday"}
+  - {date: 2024-05-27, kind: holiday, note: "Memorial Day"}
+  - {date: 2024-06-19, kind: holiday, note: "Juneteenth"}
+  - {date: 2024-07-03, kind: early_close, note: "Independence Day eve"}
+  - {date: 2024-07-04, kind: holiday, note: "Independence Day"}
+  - {date: 2024-09-02, kind: holiday, note: "Labor Day"}
+  - {date: 2024-11-28, kind: holiday, note: "Thanksgiving"}
+  - {date: 2024-11-29, kind: early_close, note: "Day after Thanksgiving"}
+  - {date: 2024-12-24, kind: early_close, note: "Christmas Eve"}
+  - {date: 2024-12-25, kind: closed, note: "Christmas"}
+  # 2025
+  - {date: 2025-01-01, kind: closed, note: "New Year's Day"}
+  - {date: 2025-01-09, kind: holiday, note: "National Day of Mourning (Carter); verify halt time"}
+  - {date: 2025-01-20, kind: holiday, note: "Martin Luther King Jr. Day"}
+  - {date: 2025-02-17, kind: holiday, note: "Presidents Day"}
+  - {date: 2025-04-18, kind: closed, note: "Good Friday"}
+  - {date: 2025-05-26, kind: holiday, note: "Memorial Day"}
+  - {date: 2025-06-19, kind: holiday, note: "Juneteenth"}
+  - {date: 2025-07-03, kind: early_close, note: "Independence Day eve"}
+  - {date: 2025-07-04, kind: holiday, note: "Independence Day"}
+  - {date: 2025-09-01, kind: holiday, note: "Labor Day"}
+  - {date: 2025-11-27, kind: holiday, note: "Thanksgiving"}
+  - {date: 2025-11-28, kind: early_close, note: "Day after Thanksgiving"}
+  - {date: 2025-12-24, kind: early_close, note: "Christmas Eve"}
+  - {date: 2025-12-25, kind: closed, note: "Christmas"}
+  # 2026
+  - {date: 2026-01-01, kind: closed, note: "New Year's Day"}
+  - {date: 2026-01-19, kind: holiday, note: "Martin Luther King Jr. Day"}
+  - {date: 2026-02-16, kind: holiday, note: "Presidents Day"}
+  - {date: 2026-04-03, kind: closed, note: "Good Friday; verify (payrolls day)"}
+  - {date: 2026-05-25, kind: holiday, note: "Memorial Day"}
+  - {date: 2026-06-19, kind: holiday, note: "Juneteenth"}
+  - {date: 2026-07-03, kind: holiday, note: "Independence Day (observed)"}
+  - {date: 2026-09-07, kind: holiday, note: "Labor Day"}
+  - {date: 2026-11-26, kind: holiday, note: "Thanksgiving"}
+  - {date: 2026-11-27, kind: early_close, note: "Day after Thanksgiving"}
+  - {date: 2026-12-24, kind: early_close, note: "Christmas Eve"}
+  - {date: 2026-12-25, kind: closed, note: "Christmas"}

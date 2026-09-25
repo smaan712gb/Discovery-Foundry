@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+*.egg-info/
+dist/
+build/
+
+# Market data and derived artefacts never go in git.
+data/raw/
+data/processed/
+data/holdout_sealed/
+results/
+*.duckdb
+*.duckdb.wal
+
+.env

@@ -1,0 +1,101 @@
+# NQ Discovery Foundry v0 configuration. Every tunable number lives here or in the calendar file.
+seed: 20260924
+
+data:
+  instrument:
+    root: NQ
+    tick_size: 0.25
+    bar_minutes: 1
+
+  sources:
+    # The owner's 2025 NinjaTrader exports. Timezone is UTC and stamps mark bar END; see ADR 0002
+    # for the evidence. Add the 2018-2024 export as another source with its own timezone.
+    - name: ninjatrader_2025
+      format: ninjatrader_txt
+      directory: "C:/Projects/favio_NQ_lucid/data/historical"
+      filename_regex: '^NQ (?P<month>\d{2})-(?P<year>\d{2})\.Last-[Mm]inute\.txt$'
+      timezone: UTC
+      timestamp_label: end
+
+  calendar_file: config/calendar_cme_equity.yaml
+
+  sessions:
+    rth_open: "09:30"
+    rth_close: "16:00"
+    globex_close: "17:00"
+    globex_open: "18:00"
+
+  roll:
+    rule: volume_crossover
+
+  quality:
+    bad_tick_atr_period: 60
+    bad_tick_atr_multiple: 20.0
+    # Above this fraction of bars inside the 17:00-18:00 ET break, the build fails:
+    # the source timezone is almost certainly wrong.
+    max_break_fraction: 0.001
+    top_gaps_reported: 20
+
+  # Owner decision 2026-09-24: 2025 onward is the full history (ADR 0006).
+  splits:
+    search: {start: 2025-01-01, end: 2025-12-31}
+    validation: {start: 2026-01-01, end: 2026-04-30}
+    holdout_start: 2026-05-01
+    min_trading_days_search: 200
+    min_trading_days_validation: 70
+
+  processed_dir: data/processed
+
+holdout:
+  directory: data/holdout_sealed
+
+evaluator:
+  contracts:
+    NQ: {tick_size: 0.25, point_value: 20.0, commission_round_turn: 4.50}
+    # MNQ commission: set to your broker's all-in round-turn rate.
+    MNQ: {tick_size: 0.25, point_value: 2.0, commission_round_turn: 1.50}
+  default_contract: NQ
+  contracts_per_trade: 1
+  slippage_ticks: {market: 1, stop: 1, limit: 0}
+  limit_trade_through_ticks: 1
+  annualization_days: 252
+  block_signals_on_flags: [bad_tick, ohlc_invalid]
+  regimes:
+    vol_lookback_days: 60
+    trend_days: 20
+  events_file: config/events.yaml
+  results_db: results/foundry.duckdb
+
+# Kill tests (ADR 0008). Not part of any engine config: the meta layer can't change these.
+critics:
+  min_trades: {search: 200, validation: 80}
+  cost_stress_multiplier: 2.0
+  concentration: {top_day_fraction: 0.05, max_profit_share: 0.5}
+  min_profitable_regimes: 2
+  dsr_threshold: 0.95
+  perturbations: [-0.2, -0.1, 0.1, 0.2]
+  pbo_threshold: 0.2
+  pbo_min_trials: 8
+  cscv_blocks: 16
+  cpcv: {groups: 6, test_groups: 2, embargo_days: 1, min_positive_fraction: 0.6}
+
+# Search (ADR 0009). Budgets are hard caps per run; the engine file holds everything the meta layer
+# may change.
+search:
+  engine_file: config/engines/engine_v0.yaml
+  budgets:
+    wall_clock_seconds: 3600
+    max_evaluations: 5000
+    llm_dollars: 1.00
+    llm_tokens: 2000000
+  llm:
+    base_url: https://api.deepseek.com
+    model: deepseek-flash               # DeepSeek-V4.1-Flash
+    api_key_env: DEEPSEEK_API_KEY
+    # Charged at the peak list price (2026-09) so the dollar budget is never underestimated.
+    price_input_per_mtok: 0.30
+    price_output_per_mtok: 1.20
+    max_output_tokens: 6000
+    temperature: 1.0
+    timeout_seconds: 120
+    max_retries: 2

@@ -1,0 +1,33 @@
+{
+  "dsl_version": 1,
+  "name": "baseline_rth_orb",
+  "rationale": "Hand-written sanity check: trade the break of the RTH opening range in the first hours, fixed stop and target, flat by the close.",
+  "session": "RTH",
+  "params": {
+    "or_minutes": {"type": "int", "low": 15, "high": 60, "value": 30},
+    "entry_cutoff": {"type": "int", "low": 60, "high": 240, "value": 120},
+    "stop_pts": {"type": "float", "low": 10, "high": 60, "value": 25},
+    "target_pts": {"type": "float", "low": 20, "high": 120, "value": 50}
+  },
+  "features": [
+    {"id": "or_high", "kind": "opening_range_high", "args": {"minutes": {"param": "or_minutes"}}},
+    {"id": "or_low", "kind": "opening_range_low", "args": {"minutes": {"param": "or_minutes"}}},
+    {"id": "minute", "kind": "minutes_into_session"}
+  ],
+  "entry": {
+    "long": {"all": [
+      {"op": "cross_above", "left": {"price": "close"}, "right": {"feature": "or_high"}},
+      {"op": "<", "left": {"feature": "minute"}, "right": {"param": "entry_cutoff"}}
+    ]},
+    "short": {"all": [
+      {"op": "cross_below", "left": {"price": "close"}, "right": {"feature": "or_low"}},
+      {"op": "<", "left": {"feature": "minute"}, "right": {"param": "entry_cutoff"}}
+    ]},
+    "order": {"type": "market"}
+  },
+  "exit": {
+    "stop": {"points": {"param": "stop_pts"}},
+    "target": {"points": {"param": "target_pts"}},
+    "session_flat": true
+  }
+}

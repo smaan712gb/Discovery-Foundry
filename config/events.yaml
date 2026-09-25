@@ -1,0 +1,23 @@
+# Event days a spec can exclude with `filters.exclude_event_days: true`. Dates are trading dates (ET).
+#
+# FOMC statement days only, entered by hand from the Federal Reserve's published schedule. CPI and
+# payrolls dates are NOT listed yet: 2025 release dates moved around the government shutdown, and
+# they need a primary source (see TODO.md).
+name: macro_events
+entries:
+  - {date: 2025-01-29, kind: fomc}
+  - {date: 2025-03-19, kind: fomc}
+  - {date: 2025-05-07, kind: fomc}
+  - {date: 2025-06-18, kind: fomc}
+  - {date: 2025-07-30, kind: fomc}
+  - {date: 2025-09-17, kind: fomc}
+  - {date: 2025-10-29, kind: fomc}
+  - {date: 2025-12-10, kind: fomc}
+  - {date: 2026-01-28, kind: fomc}
+  - {date: 2026-03-18, kind: fomc}
+  - {date: 2026-04-29, kind: fomc}
+  - {date: 2026-06-17, kind: fomc}
+  - {date: 2026-07-29, kind: fomc}
+  - {date: 2026-09-16, kind: fomc}
+  - {date: 2026-10-28, kind: fomc}
+  - {date: 2026-12-09, kind: fomc}

@@ -1,0 +1,16 @@
+# Engine v0: how the search runs. The meta layer (phase 5) proposes N+1 by editing this file.
+# Critic thresholds are NOT here and cannot be changed by an engine (ADR 0008).
+label: v0
+generations: 40
+batch_size: 60
+mix: {random: 0.25, genetic: 0.45, cma: 0.15, llm: 0.15}
+genetic: {elite: 12, tournament: 3, crossover_rate: 0.3, sigma: 0.15}
+cma: {sigma0: 0.2, popsize: 8}
+surrogate: {enabled: true, min_train: 80, oversample: 2.0, num_leaves: 15, n_estimators: 200}
+llm:
+  prompt_template: config/prompts/proposer_v1.md
+  specs_per_call: 6
+  death_examples: 8
+  top_examples: 5
+top_k: 10
+trade_penalty: 10.0

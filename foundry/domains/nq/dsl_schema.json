@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://foundry.local/nq/dsl/v1",
+  "title": "NQ strategy spec, DSL v1",
+  "description": "Every number in a spec is a reference to a bounded parameter, so the search space is closed. Semantics: ADR 0007.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dsl_version", "name", "session", "params", "features", "entry", "exit"],
+  "properties": {
+    "dsl_version": {"const": 1},
+    "name": {"type": "string", "pattern": "^[a-z0-9_\\-]{1,64}$"},
+    "rationale": {"type": "string", "maxLength": 300},
+    "session": {"enum": ["RTH", "ETH", "both"]},
+    "params": {
+      "type": "object",
+      "maxProperties": 24,
+      "propertyNames": {"pattern": "^[a-z][a-z0-9_]{0,31}$"},
+      "additionalProperties": {"$ref": "#/$defs/param"}
+    },
+    "features": {"type": "array", "maxItems": 12, "items": {"$ref": "#/$defs/feature"}},
+    "entry": {"$ref": "#/$defs/entry"},
+    "exit": {"$ref": "#/$defs/exit"},
+    "filters": {"$ref": "#/$defs/filters"}
+  },
+  "$defs": {
+    "param_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["param"],
+      "properties": {"param": {"type": "string"}}
+    },
+    "param": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "low", "high", "value"],
+      "properties": {
+        "type": {"enum": ["int", "float"]},
+        "low": {"type": "number"},
+        "high": {"type": "number"},
+        "value": {"type": "number"}
+      }
+    },
+    "feature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$"},
+        "kind": {
+          "enum": [
+            "returns", "atr", "vwap_distance", "opening_range_high", "opening_range_low",
+            "overnight_high", "overnight_low", "overnight_gap", "session_volume_ratio",
+            "realized_vol", "prior_day_high", "prior_day_low", "prior_day_close",
+            "close_zscore", "minutes_into_session"
+          ]
+        },
+        "args": {"type": "object", "additionalProperties": {"$ref": "#/$defs/param_ref"}}
+      }
+    },
+    "operand": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false, "required": ["feature"],
+          "properties": {"feature": {"type": "string"}}
+        },
+        {"$ref": "#/$defs/param_ref"},
+        {
+          "type": "object", "additionalProperties": false, "required": ["price"],
+          "properties": {"price": {"enum": ["open", "high", "low", "close"]}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["add"],
+          "properties": {"add": {"type": "array", "minItems": 2, "maxItems": 2,
+                                 "items": {"$ref": "#/$defs/operand"}}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["sub"],
+          "properties": {"sub": {"type": "array", "minItems": 2, "maxItems": 2,
+                                 "items": {"$ref": "#/$defs/operand"}}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["mul"],
+          "properties": {"mul": {"type": "array", "minItems": 2, "maxItems": 2,
+                                 "items": {"$ref": "#/$defs/operand"}}}
+        }
+      ]
+    },
+    "rule": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false, "required": ["all"],
+          "properties": {"all": {"type": "array", "minItems": 1, "maxItems": 6,
+                                 "items": {"$ref": "#/$defs/rule"}}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["any"],
+          "properties": {"any": {"type": "array", "minItems": 1, "maxItems": 6,
+                                 "items": {"$ref": "#/$defs/rule"}}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["not"],
+          "properties": {"not": {"$ref": "#/$defs/rule"}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["op", "left", "right"],
+          "properties": {
+            "op": {"enum": [">", "<", ">=", "<=", "cross_above", "cross_below"]},
+            "left": {"$ref": "#/$defs/operand"},
+            "right": {"$ref": "#/$defs/operand"}
+          }
+        }
+      ]
+    },
+    "order": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false, "required": ["type"],
+          "properties": {"type": {"const": "market"}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["type", "valid_bars"],
+          "properties": {
+            "type": {"enum": ["stop", "limit"]},
+            "long_price": {"$ref": "#/$defs/operand"},
+            "short_price": {"$ref": "#/$defs/operand"},
+            "valid_bars": {"$ref": "#/$defs/param_ref"}
+          }
+        }
+      ]
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "long": {"$ref": "#/$defs/rule"},
+        "short": {"$ref": "#/$defs/rule"},
+        "order": {"$ref": "#/$defs/order"}
+      },
+      "anyOf": [{"required": ["long"]}, {"required": ["short"]}]
+    },
+    "distance": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false, "required": ["points"],
+          "properties": {"points": {"$ref": "#/$defs/param_ref"}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["atr_mult", "atr_feature"],
+          "properties": {"atr_mult": {"$ref": "#/$defs/param_ref"}, "atr_feature": {"type": "string"}}
+        }
+      ]
+    },
+    "exit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rule_long": {"$ref": "#/$defs/rule"},
+        "rule_short": {"$ref": "#/$defs/rule"},
+        "stop": {"$ref": "#/$defs/distance"},
+        "target": {"$ref": "#/$defs/distance"},
+        "trailing": {"$ref": "#/$defs/distance"},
+        "time_stop_bars": {"$ref": "#/$defs/param_ref"},
+        "session_flat": {"type": "boolean"}
+      }
+    },
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "volatility_buckets": {"type": "array", "minItems": 1, "uniqueItems": true,
+                               "items": {"enum": ["low", "mid", "high"]}},
+        "trend_states": {"type": "array", "minItems": 1, "uniqueItems": true,
+                         "items": {"enum": ["up", "down"]}},
+        "days_of_week": {"type": "array", "minItems": 1, "uniqueItems": true,
+                         "items": {"enum": ["mon", "tue", "wed", "thu", "fri"]}},
+        "exclude_event_days": {"type": "boolean"}
+      }
+    }
+  }
+}
