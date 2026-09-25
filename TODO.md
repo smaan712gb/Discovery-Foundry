@@ -55,8 +55,9 @@ Each item says why it is deferred and what "done" means.
 
 ## Search (phase 4 follow-ups)
 
-- **Top up the DeepSeek account.** Why: the live call returned 402 Insufficient Balance. Done:
-  `foundry search` runs with the LLM generator and `llm_calls` shows valid specs coming back.
+- **Remove the revoked DeepSeek key from the Windows user environment.** Why: it overrides the working
+  key in `.env`, so `foundry search` would fail authentication. Done:
+  `[Environment]::SetEnvironmentVariable('DEEPSEEK_API_KEY', $null, 'User')`, then restart the editor.
 - **Tune engine v0 on real data.** Why: batch size, mix and surrogate settings were set by judgment
   and checked only on synthetic data. Done: the phase 5 meta layer compares v0 against v1 over
   several seeds.

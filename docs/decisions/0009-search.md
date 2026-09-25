@@ -48,6 +48,8 @@ search minimum (`fitness = sharpe − 10`). The search can never see validation 
 - Default model: `deepseek-flash` (DeepSeek-V4.1-Flash). Every call is charged at the **peak** list price
   ($0.30 per million input tokens, $1.20 per million output), so the dollar budget can never be
   underestimated. Prices live in config.
+- `deepseek-flash` reasons ("thinks") by default, and reasoning tokens are output tokens. The `thinking`
+  setting (default `low`) keeps reasoning from eating the whole output budget.
 
 ### Budgets (hard, per run)
 

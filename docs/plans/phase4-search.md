@@ -32,7 +32,13 @@ Status: built and tested on synthetic data (2026-09-24). Design choices are in A
 
 ## Live check (2026-09-24)
 
-One real call to DeepSeek (`deepseek-flash`) authenticated, but the account returned **402 Insufficient
-Balance**. Nothing was charged and the key didn't appear in the error. The LLM generator is ready once
-the account has credit. Until then, `foundry search --no-llm` runs the genetic, CMA-ES and random
-generators.
+- First attempt: 402 Insufficient Balance. After funding, the old key had been revoked (401). The new
+  key is in `.env`, but the Windows user environment still holds the revoked key, and the environment
+  takes precedence (see TODO.md).
+- `deepseek-flash` reasons ("thinks") by default. The first funded call spent all 6,000 output tokens
+  on hidden reasoning and returned no answer. `thinking: low` is now in config, `max_output_tokens`
+  is 16,000, and a reply that hits the limit before answering raises a clear error. Its tokens are
+  still charged to the budget.
+- With that setting, one call returned **5 of 5 valid specs** for **$0.012**: an opening-range
+  breakout with volume confirmation, a VWAP stretch fade, a failed gap-up auction, a failed sweep of
+  the prior-day high, and a breakout from a compressed opening range.

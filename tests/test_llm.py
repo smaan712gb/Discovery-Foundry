@@ -151,3 +151,31 @@ def test_only_one_module_touches_the_network() -> None:
         ):
             offenders.append(path.name)
     assert offenders == ["llm_client.py"]
+
+
+def test_thinking_field_and_reasoning_overrun() -> None:
+    fake = Fake([ok({"specs": []})])
+    LLMClient(cfg().model_copy(update={"thinking": "low"}), budget(), fake).complete_json("s", "u")
+    assert fake.calls[0]["body"]["thinking"] == {"type": "enabled", "reasoning_effort": "low"}
+    fake = Fake([ok({"specs": []})])
+    LLMClient(cfg().model_copy(update={"thinking": "disabled"}), budget(), fake).complete_json(
+        "s", "u"
+    )
+    assert fake.calls[0]["body"]["thinking"] == {"type": "disabled"}
+    fake = Fake([ok({"specs": []})])
+    LLMClient(cfg(), budget(), fake).complete_json("s", "u")
+    assert "thinking" not in fake.calls[0]["body"]  # omitted for other providers
+    # All output spent on reasoning: a clear error, and the tokens are still charged.
+    overrun = (
+        200,
+        {
+            "choices": [
+                {"message": {"content": "", "reasoning_content": "..."}, "finish_reason": "length"}
+            ],
+            "usage": {"prompt_tokens": 100, "completion_tokens": 2000},
+        },
+    )
+    b = budget()
+    with pytest.raises(LLMError, match="max_output_tokens"):
+        LLMClient(cfg(), b, Fake([overrun])).complete_json("s", "u")
+    assert b.llm_tokens == 2100

@@ -95,7 +95,9 @@ search:
     # Charged at the peak list price (2026-09) so the dollar budget is never underestimated.
     price_input_per_mtok: 0.30
     price_output_per_mtok: 1.20
-    max_output_tokens: 6000
+    max_output_tokens: 16000
     temperature: 1.0
     timeout_seconds: 120
     max_retries: 2
+    # deepseek-flash reasons by default and can spend the whole output budget on it.
+    thinking: low

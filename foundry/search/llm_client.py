@@ -15,7 +15,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, HttpUrl
 
@@ -34,6 +34,9 @@ class LLMConfig(StrictModel):
     temperature: float = Field(ge=0, le=2)
     timeout_seconds: float = Field(gt=0)
     max_retries: int = Field(ge=0, le=5)
+    # Provider reasoning ("thinking") mode. None omits the field for providers without it.
+    # Reasoning tokens count as output tokens and are charged like them.
+    thinking: Literal["disabled", "low", "high", "max"] | None = None
 
 
 class LLMError(Exception):
@@ -88,19 +91,22 @@ class LLMClient:
         ):
             raise LLMError("LLM budget would be exceeded by this call; not sent")
         key = require(self.cfg.api_key_env)
-        body = json.dumps(
-            {
-                "model": self.cfg.model,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                "response_format": {"type": "json_object"},
-                "temperature": self.cfg.temperature,
-                "max_tokens": self.cfg.max_output_tokens,
-                "stream": False,
-            }
-        ).encode("utf-8")
+        request: dict[str, Any] = {
+            "model": self.cfg.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": self.cfg.temperature,
+            "max_tokens": self.cfg.max_output_tokens,
+            "stream": False,
+        }
+        if self.cfg.thinking == "disabled":
+            request["thinking"] = {"type": "disabled"}
+        elif self.cfg.thinking is not None:
+            request["thinking"] = {"type": "enabled", "reasoning_effort": self.cfg.thinking}
+        body = json.dumps(request).encode("utf-8")
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
         url = str(self.cfg.base_url).rstrip("/") + "/chat/completions"
         last = ""
@@ -120,11 +126,17 @@ class LLMClient:
     def _parse(self, raw: bytes) -> LLMReply:
         try:
             data: dict[str, Any] = json.loads(raw)
-            content = str(data["choices"][0]["message"]["content"])
+            choice = data["choices"][0]
+            content = str(choice["message"].get("content") or "")
             usage = data.get("usage", {})
             pt, ct = int(usage.get("prompt_tokens", 0)), int(usage.get("completion_tokens", 0))
         except (ValueError, KeyError, IndexError, TypeError) as exc:
             raise LLMError(f"unexpected LLM response shape: {exc}") from exc
         dollars = self.price(pt, ct)
-        self.budget.charge_llm(dollars, pt + ct)
+        self.budget.charge_llm(dollars, pt + ct)  # charged even if the reply is unusable
+        if choice.get("finish_reason") == "length" and not content.strip():
+            raise LLMError(
+                f"reply hit max_output_tokens ({self.cfg.max_output_tokens}) before any answer; "
+                "reasoning used the whole budget (lower `thinking` or raise max_output_tokens)"
+            )
         return LLMReply(content, pt, ct, dollars)
