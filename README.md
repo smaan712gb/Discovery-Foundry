@@ -4,9 +4,9 @@ A research engine that searches for NQ futures strategies and then tries hard to
 means an honest pipeline that reports which candidates survive, which die, and why. It is not a trading
 system: there are no broker connections and no order routing.
 
-**Status:** phases 1 (data pipeline), 2 (evaluator and strategy DSL), 3 (kill tests) and 4 (search) are
+**Status:** phases 1–5 (data pipeline, evaluator and strategy DSL, kill tests, search, meta layer) are
 built and tested on synthetic data. The real data build is waiting on a NinjaTrader export covering 2025 onward (see
-`TODO.md`). Phases 5–6 have not started.
+`TODO.md`). Phase 6 (HTML reports and `foundry run`) has not started.
 
 ## Setup
 
@@ -26,6 +26,9 @@ uv run ruff check foundry tests; uv run mypy   # lint + strict types
 | `foundry evaluate <spec> --split search [--contract MNQ]` | Backtests a spec with costs always on and records it in `results/foundry.duckdb`. `--split validation` uses search bars as warm-up and trades only validation bars. |
 | `foundry critique <spec>` | Runs the 8 kill tests on search, then on validation, and records every number and the verdict (ADR 0008). |
 | `foundry search [--no-llm]` | One search run on the search split: LLM, genetic, CMA-ES and random generators, surrogate pre-screen, hard budgets. The top candidates then go to the critics (ADR 0009). |
+| `foundry meta propose [--llm]` | Creates engine N+1 from the current champion and writes `config/engines/engine_vN.yaml` (ADR 0010). |
+| `foundry meta tournament --challenger <yaml>` | Champion vs challenger over K seeds with equal budgets and isolated stores. Promotes only on a significant win (one-sided Wilcoxon) that breaks no constraint. |
+| `foundry meta status` | Current champion, tournament history, and how many times each validation fold has been used. |
 | `foundry funnel` | Generated → evaluated → killed by each test → alive, from the results store. |
 | `foundry holdout status --config config/v0.yaml` | Verifies the sealed files against their SHA-256 manifest. Shows row counts and the access log, never data. |
 | `foundry holdout open --engine <id> --candidates <hashes> --reason <text>` | The one way to evaluate on the holdout. Logged before any data is read, and at most once per candidate. **Don't run it without the owner's decision.** |
@@ -70,11 +73,12 @@ deflated Sharpe accounting for how many strategies were tried.
 | `foundry/core/` | Domain-agnostic config, hashing, reproducibility, verification, holdout vault |
 | `foundry/domains/nq/` | Data pipeline, plus DSL (`dsl.py`, `dsl_schema.json`), features, signal compiler, Numba backtester, evaluator |
 | `foundry/search/` | Search loop, engine config, CMA-ES, surrogate, LLM client and proposer |
+| `foundry/meta/` | Engine proposals, tournaments, promotion rule |
 | `foundry/critics/` | Kill-test statistics and runner |
 | `strategies/` | Hand-written specs (the baseline RTH opening-range breakout) |
 | `config/` | `v0.yaml` and `calendar_cme_equity.yaml` |
 | `data/` | `raw/`, `processed/`, `holdout_sealed/` (git-ignored) |
-| `docs/decisions/` | ADRs 0001–0009 |
+| `docs/decisions/` | ADRs 0001–0010 |
 | `docs/plans/` | Phase plans |
 
 ## Ground rules enforced in code

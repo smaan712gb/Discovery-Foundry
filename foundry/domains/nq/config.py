@@ -13,6 +13,7 @@ from pydantic import Field, field_validator, model_validator
 from foundry.core.budgets import BudgetConfig
 from foundry.core.config import StrictModel
 from foundry.critics.config import CriticConfig
+from foundry.meta.config import MetaConfig
 from foundry.search.llm_client import LLMConfig
 
 EXCHANGE_TZ = "America/New_York"
@@ -200,7 +201,7 @@ class SearchConfig(StrictModel):
 
 
 class FoundryConfig(StrictModel):
-    """Top-level config. The meta layer (phase 5) adds its own section."""
+    """Top-level config (see config/v0.yaml)."""
 
     seed: int
     data: DataConfig
@@ -208,6 +209,7 @@ class FoundryConfig(StrictModel):
     evaluator: EvaluatorConfig
     critics: CriticConfig
     search: SearchConfig
+    meta: MetaConfig
 
 
 class EventEntry(StrictModel):

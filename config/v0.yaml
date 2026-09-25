@@ -101,3 +101,18 @@ search:
     max_retries: 2
     # deepseek-flash reasons by default and can spend the whole output budget on it.
     thinking: low
+
+# Meta layer (ADR 0010): engine N vs N+1 tournaments. Not part of any engine.
+meta:
+  seeds: 6
+  run_budget:                     # per (engine, seed) run; a tournament costs (2 x seeds + 1) runs
+    wall_clock_seconds: 900
+    max_evaluations: 1500
+    llm_dollars: 0.25
+    llm_tokens: 600000
+  wilcoxon_alpha: 0.05
+  max_runtime_ratio: 1.5
+  validation_folds: 3
+  workspace: results/tournaments
+  mix_concentration: 40
+  jitter: 0.25

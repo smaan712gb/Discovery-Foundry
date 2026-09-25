@@ -18,9 +18,12 @@ from foundry.domains.nq.build import run_build
 from foundry.domains.nq.config import FoundryConfig
 from foundry.domains.nq.dsl import SpecError, load_spec, validate_spec
 from foundry.domains.nq.evaluator import EvaluationError, NQEvaluator
+from foundry.domains.nq.meta_runner import make_run_fn
 from foundry.domains.nq.space import NQSpecSpace
-from foundry.search.engine import load_engine
-from foundry.search.llm_client import LLMClient
+from foundry.meta.propose import ProposalError, propose_by_code, propose_by_llm, write_engine
+from foundry.meta.tournament import run_tournament
+from foundry.search.engine import EngineConfig, load_engine
+from foundry.search.llm_client import LLMCache, LLMClient
 from foundry.search.run import SearchRun, run_search
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -180,6 +183,138 @@ def search(
         )
     )
     typer.echo(f"run {result.run_id}: {result.status}")
+
+
+meta_app = typer.Typer(no_args_is_help=True, help="Meta layer: engine N vs N+1 (ADR 0010).")
+app.add_typer(meta_app, name="meta")
+
+
+def _registry_with_champion(cfg: FoundryConfig, store: ResultsStore) -> tuple[EngineConfig, str]:
+    """The current champion; registers the configured engine as the first one if none exists."""
+    champ = store.champion()
+    if champ is None:
+        ecfg, eid = load_engine(cfg.search.engine_file)
+        store.register_engine(
+            eid, ecfg.label, ecfg.model_dump_json(), None, "manual", "initial engine from config"
+        )
+        store.set_champion(eid, None)
+        return ecfg, eid
+    raw = store.engine_config_json(champ)
+    if raw is None:
+        raise EvaluationError(f"champion {champ} is missing from the engine registry")
+    return EngineConfig.model_validate_json(raw), champ
+
+
+def _next_label(store: ResultsStore) -> str:
+    n = 1
+    labels = set(store.engine_labels())
+    while f"v{n}" in labels:
+        n += 1
+    return f"v{n}"
+
+
+@meta_app.command("propose")
+def meta_propose(
+    config: ConfigOpt = Path("config/v0.yaml"),
+    llm: Annotated[bool, typer.Option("--llm", help="let the LLM propose (validated)")] = False,
+    seed: Annotated[int, typer.Option(help="seed for the code proposer")] = 0,
+) -> None:
+    """Create engine N+1 from the current champion and write its YAML."""
+    load_dotenv(Path.cwd() / ".env")
+    try:
+        cfg = load_model(config, FoundryConfig)
+        path = cfg.evaluator.results_db
+        with ResultsStore(path if path.is_absolute() else Path.cwd() / path) as store:
+            parent, parent_id = _registry_with_champion(cfg, store)
+            label = _next_label(store)
+            if llm:
+                budget = RunBudget(cfg.search.budgets)
+                prop = propose_by_llm(
+                    parent,
+                    label,
+                    store.tournament_history(),
+                    LLMClient(cfg.search.llm, budget),
+                    Path("config/prompts"),
+                )
+            else:
+                prop = propose_by_code(parent, label, cfg.meta, seed, allow_llm=parent.mix.llm > 0)
+            out = write_engine(prop, Path("config/engines"))
+            store.register_engine(
+                prop.engine_id,
+                label,
+                prop.cfg.model_dump_json(),
+                parent_id,
+                prop.proposer,
+                prop.rationale,
+            )
+    except (ConfigError, EvaluationError, ProposalError, SecretError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(f"challenger {prop.engine_id} (parent {parent_id}) written to {out}")
+    typer.echo(f"rationale: {prop.rationale}")
+
+
+@meta_app.command("tournament")
+def meta_tournament(
+    challenger: Annotated[Path, typer.Option(exists=True, dir_okay=False, help="engine YAML")],
+    config: ConfigOpt = Path("config/v0.yaml"),
+    no_llm: Annotated[bool, typer.Option("--no-llm", help="disable the LLM generator")] = False,
+) -> None:
+    """Champion vs challenger over K seeds with equal budgets; promote only on a significant win."""
+    load_dotenv(Path.cwd() / ".env")
+    try:
+        cfg = load_model(config, FoundryConfig)
+        path = cfg.evaluator.results_db
+        workspace = (
+            cfg.meta.workspace
+            if cfg.meta.workspace.is_absolute()
+            else Path.cwd() / cfg.meta.workspace
+        )
+        with ResultsStore(path if path.is_absolute() else Path.cwd() / path) as store:
+            champ = _registry_with_champion(cfg, store)
+            ch_cfg, ch_id = load_engine(challenger)
+            if ch_id == champ[1]:
+                raise EvaluationError("the challenger is identical to the champion")
+            store.register_engine(
+                ch_id,
+                ch_cfg.label,
+                ch_cfg.model_dump_json(),
+                champ[1],
+                "manual",
+                f"from {challenger}",
+            )
+            cache = LLMCache(workspace / "llm_cache.duckdb")
+            try:
+                run_fn = make_run_fn(cfg, Path.cwd(), cfg.meta, not no_llm, cache)
+                result = run_tournament(cfg.meta, champ, (ch_cfg, ch_id), run_fn, store, workspace)
+            finally:
+                cache.close()
+            touches = store.validation_touches()
+    except (ConfigError, EvaluationError, SecretError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(
+        json.dumps(result.summary() | {"validation_touches": touches}, indent=2, default=str)
+    )
+
+
+@meta_app.command("status")
+def meta_status(config: ConfigOpt = Path("config/v0.yaml")) -> None:
+    """Current champion, tournament history and how often validation has been touched."""
+    cfg = load_model(config, FoundryConfig)
+    path = cfg.evaluator.results_db
+    with ResultsStore(path if path.is_absolute() else Path.cwd() / path) as store:
+        typer.echo(
+            json.dumps(
+                {
+                    "champion": store.champion(),
+                    "tournaments": store.tournament_history(),
+                    "validation_touches": store.validation_touches(),
+                },
+                indent=2,
+                default=str,
+            )
+        )
 
 
 @app.command("funnel")

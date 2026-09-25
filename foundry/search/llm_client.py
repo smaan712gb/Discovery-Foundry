@@ -9,14 +9,17 @@ used; a call whose worst case would break the budget is never sent.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal
 
+import duckdb
 from pydantic import Field, HttpUrl
 
 from foundry.core.budgets import RunBudget
@@ -66,13 +69,49 @@ def _urllib_transport(
         return int(exc.code), exc.read()
 
 
+class LLMCache:
+    """Replies keyed by the exact request body, so a re-run replays identical LLM output (ADR 0010).
+
+    A cache hit costs nothing and sends nothing. Stored: request hash and reply text only.
+    """
+
+    def __init__(self, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self._con = duckdb.connect(str(path))
+        self._con.execute(
+            "CREATE TABLE IF NOT EXISTS llm_cache (key VARCHAR PRIMARY KEY, "
+            "content VARCHAR NOT NULL,"
+            " prompt_tokens INTEGER NOT NULL, completion_tokens INTEGER NOT NULL)"
+        )
+
+    def get(self, key: str) -> tuple[str, int, int] | None:
+        row = self._con.execute(
+            "SELECT content, prompt_tokens, completion_tokens FROM llm_cache WHERE key = ?", [key]
+        ).fetchone()
+        return (str(row[0]), int(row[1]), int(row[2])) if row else None
+
+    def put(self, key: str, content: str, prompt_tokens: int, completion_tokens: int) -> None:
+        self._con.execute(
+            "INSERT INTO llm_cache VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+            [key, content, prompt_tokens, completion_tokens],
+        )
+
+    def close(self) -> None:
+        self._con.close()
+
+
 class LLMClient:
     def __init__(
-        self, cfg: LLMConfig, budget: RunBudget, transport: Transport | None = None
+        self,
+        cfg: LLMConfig,
+        budget: RunBudget,
+        transport: Transport | None = None,
+        cache: LLMCache | None = None,
     ) -> None:
         self.cfg = cfg
         self.budget = budget
         self._transport = transport or _urllib_transport
+        self.cache = cache
 
     def price(self, prompt_tokens: int, completion_tokens: int) -> float:
         return (
@@ -90,7 +129,6 @@ class LLMClient:
             self.price(est_in, self.cfg.max_output_tokens), worst_tokens
         ):
             raise LLMError("LLM budget would be exceeded by this call; not sent")
-        key = require(self.cfg.api_key_env)
         request: dict[str, Any] = {
             "model": self.cfg.model,
             "messages": [
@@ -106,7 +144,11 @@ class LLMClient:
             request["thinking"] = {"type": "disabled"}
         elif self.cfg.thinking is not None:
             request["thinking"] = {"type": "enabled", "reasoning_effort": self.cfg.thinking}
-        body = json.dumps(request).encode("utf-8")
+        body = json.dumps(request, sort_keys=True).encode("utf-8")
+        cache_key = hashlib.sha256(body).hexdigest()
+        if self.cache is not None and (hit := self.cache.get(cache_key)) is not None:
+            return LLMReply(hit[0], hit[1], hit[2], 0.0)
+        key = require(self.cfg.api_key_env)
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
         url = str(self.cfg.base_url).rstrip("/") + "/chat/completions"
         last = ""
@@ -116,7 +158,12 @@ class LLMClient:
             except (OSError, TimeoutError) as exc:
                 status, raw = 0, redact(str(exc), key).encode()
             if status == 200:
-                return self._parse(raw)
+                reply = self._parse(raw)
+                if self.cache is not None:
+                    self.cache.put(
+                        cache_key, reply.content, reply.prompt_tokens, reply.completion_tokens
+                    )
+                return reply
             last = redact(raw.decode("utf-8", "replace")[:300], key)
             if status in (400, 401, 402, 403, 422):
                 break  # not retryable

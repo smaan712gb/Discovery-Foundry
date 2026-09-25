@@ -62,6 +62,12 @@ Each item says why it is deferred and what "done" means.
   and checked only on synthetic data. Done: the phase 5 meta layer compares v0 against v1 over
   several seeds.
 
+## Meta layer (phase 5 follow-ups)
+
+- **First real tournament.** Why: it needs the real data build, and it spends validation (each
+  tournament uses a validation fold, ADR 0010). Done: the owner approves the cost (up to $3.25 LLM
+  spend and about 3 hours with the defaults), and `foundry meta status` shows the result.
+
 ## Platforms and data (ADR 0006)
 
 - **Exporters to NinjaScript and Pine Script v6**, plus `foundry parity`. Why: survivors must run on both
@@ -75,7 +81,6 @@ Each item says why it is deferred and what "done" means.
   order-book features. Done: an ADR on which L2 features (for example top-of-book imbalance) would be
   worth their data cost, with a separate tick/L2 loader and backtester. Not before v0 is done.
 
-## Later phases (not started; phases 2-4 are done, see docs/plans/)
+## Later phases (not started; phases 2-5 are done, see docs/plans/)
 
-- Phase 5: meta layer (engine N vs N+1 tournaments, Wilcoxon promotion).
 - Phase 6: HTML reports and `foundry run`.

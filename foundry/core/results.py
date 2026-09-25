@@ -95,6 +95,41 @@ CREATE TABLE IF NOT EXISTS llm_calls (
     error VARCHAR,
     created_at TIMESTAMP NOT NULL
 );
+CREATE TABLE IF NOT EXISTS engines (
+    engine_id VARCHAR PRIMARY KEY,
+    label VARCHAR NOT NULL,
+    config_json VARCHAR NOT NULL,
+    parent_id VARCHAR,
+    proposer VARCHAR NOT NULL,
+    rationale VARCHAR NOT NULL,
+    created_at TIMESTAMP NOT NULL
+);
+CREATE TABLE IF NOT EXISTS champions (
+    engine_id VARCHAR NOT NULL,
+    tournament_id VARCHAR,
+    since TIMESTAMP NOT NULL
+);
+CREATE TABLE IF NOT EXISTS tournaments (
+    tournament_id VARCHAR PRIMARY KEY,
+    champion_id VARCHAR NOT NULL,
+    challenger_id VARCHAR NOT NULL,
+    validation_fold INTEGER NOT NULL,
+    p_value DOUBLE NOT NULL,
+    promoted BOOLEAN NOT NULL,
+    summary_json VARCHAR NOT NULL,
+    created_at TIMESTAMP NOT NULL
+);
+CREATE TABLE IF NOT EXISTS tournament_runs (
+    tournament_id VARCHAR NOT NULL,
+    engine_id VARCHAR NOT NULL,
+    seed INTEGER NOT NULL,
+    run_id VARCHAR NOT NULL,
+    status VARCHAR NOT NULL,
+    score DOUBLE NOT NULL,
+    alive INTEGER NOT NULL,
+    evaluated INTEGER NOT NULL,
+    wall_clock DOUBLE NOT NULL
+);
 CREATE TABLE IF NOT EXISTS daily_pnl (
     eval_key VARCHAR NOT NULL,
     trading_date DATE NOT NULL,
@@ -433,6 +468,109 @@ class ResultsStore:
             }
             for r in rows
         ]
+
+    # ---- meta layer registry (ADR 0010) ----------------------------------------------------
+
+    def register_engine(
+        self,
+        engine_id: str,
+        label: str,
+        config_json: str,
+        parent_id: str | None,
+        proposer: str,
+        rationale: str,
+    ) -> None:
+        self._con.execute(
+            "INSERT INTO engines VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (engine_id) DO NOTHING",
+            [
+                engine_id,
+                label,
+                config_json,
+                parent_id,
+                proposer,
+                rationale,
+                datetime.now(UTC).replace(tzinfo=None),
+            ],
+        )
+
+    def engine_config_json(self, engine_id: str) -> str | None:
+        row = self._con.execute(
+            "SELECT config_json FROM engines WHERE engine_id = ?", [engine_id]
+        ).fetchone()
+        return str(row[0]) if row else None
+
+    def engine_labels(self) -> list[str]:
+        return [str(r[0]) for r in self._con.execute("SELECT label FROM engines").fetchall()]
+
+    def champion(self) -> str | None:
+        row = self._con.execute(
+            "SELECT engine_id FROM champions ORDER BY since DESC LIMIT 1"
+        ).fetchone()
+        return str(row[0]) if row else None
+
+    def set_champion(self, engine_id: str, tournament_id: str | None) -> None:
+        self._con.execute(
+            "INSERT INTO champions VALUES (?, ?, ?)",
+            [engine_id, tournament_id, datetime.now(UTC).replace(tzinfo=None)],
+        )
+
+    def tournament_count(self) -> int:
+        row = self._con.execute("SELECT COUNT(*) FROM tournaments").fetchone()
+        return int(row[0]) if row else 0
+
+    def record_tournament(
+        self, summary: dict[str, Any], runs: list[tuple[str, int, str, str, float, int, int, float]]
+    ) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        self._con.execute(
+            "INSERT INTO tournaments VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                summary["tournament_id"],
+                summary["champion"],
+                summary["challenger"],
+                summary["validation_fold"],
+                summary["p_value"],
+                summary["promoted"],
+                json.dumps(summary, sort_keys=True, default=str),
+                now,
+            ],
+        )
+        for r in runs:
+            self._con.execute(
+                "INSERT INTO tournament_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [summary["tournament_id"], *r],
+            )
+
+    def tournament_history(self) -> list[dict[str, Any]]:
+        """Aggregate history for proposers and reports: engines, mean scores, decisions."""
+        rows = self._con.execute(
+            "SELECT t.tournament_id, t.champion_id, t.challenger_id, t.p_value, t.promoted, "
+            "avg(CASE WHEN r.engine_id = t.champion_id THEN r.score END), "
+            "avg(CASE WHEN r.engine_id = t.challenger_id THEN r.score END) "
+            "FROM tournaments t JOIN tournament_runs r USING (tournament_id) "
+            "GROUP BY ALL ORDER BY t.tournament_id"
+        ).fetchall()
+        return [
+            {
+                "tournament": r[0],
+                "champion": r[1],
+                "challenger": r[2],
+                "p_value": r[3],
+                "promoted": r[4],
+                "champion_mean_score": r[5],
+                "challenger_mean_score": r[6],
+            }
+            for r in rows
+        ]
+
+    def validation_touches(self) -> dict[str, int]:
+        """How many tournaments have used each validation fold (ADR 0010)."""
+        rows = self._con.execute(
+            "SELECT validation_fold, COUNT(*) FROM tournaments GROUP BY 1 ORDER BY 1"
+        ).fetchall()
+        out = {f"fold_{int(r[0])}": int(r[1]) for r in rows}
+        out["total"] = sum(out.values())
+        return out
 
     def spec_json(self, spec_hash: str) -> str | None:
         row = self._con.execute(

@@ -141,9 +141,15 @@ class NQEvaluator:
     """Loads verified processed data once and evaluates specs on the search or validation split."""
 
     def __init__(
-        self, cfg: FoundryConfig, repo_root: Path, config_path: Path | None = None
+        self,
+        cfg: FoundryConfig,
+        repo_root: Path,
+        config_path: Path | None = None,
+        validation_window: tuple[date, date] | None = None,
     ) -> None:
+        """`validation_window`: restrict validation trades to these dates (a fold, ADR 0010)."""
         self.cfg = cfg
+        self.validation_window = validation_window
         self.root = repo_root
         d = cfg.data
 
@@ -187,7 +193,13 @@ class NQEvaluator:
                 self.cfg.evaluator.regimes,
                 self.events,
             )
-            mask = None if split == SEARCH else (ctx.frame["split"] == VALIDATION).to_numpy()
+            mask = None
+            if split != SEARCH:
+                sel = ctx.frame["split"] == VALIDATION
+                if self.validation_window is not None:
+                    lo, hi = self.validation_window
+                    sel = sel & ctx.frame["trading_date"].is_between(lo, hi)
+                mask = sel.to_numpy()
             self._contexts[split] = (ctx, mask)
         return self._contexts[split]
 
@@ -261,7 +273,10 @@ class NQEvaluator:
         )
 
     def eval_config_hash(self, contract: str, slippage_multiplier: float) -> str:
-        return sha256_text(f"{config_hash(self.cfg.evaluator)}|{contract}|{slippage_multiplier}")
+        window = self.validation_window or ("", "")
+        return sha256_text(
+            f"{config_hash(self.cfg.evaluator)}|{contract}|{slippage_multiplier}|{window[0]}|{window[1]}"
+        )
 
     def evaluate(
         self,

@@ -91,6 +91,23 @@ SEARCH_CFG: dict[str, object] = {
 }
 
 
+META_CFG: dict[str, object] = {
+    "seeds": 3,
+    "run_budget": {
+        "wall_clock_seconds": 300,
+        "max_evaluations": 40,
+        "llm_dollars": 0.0,
+        "llm_tokens": 0,
+    },
+    "wilcoxon_alpha": 0.2,
+    "max_runtime_ratio": 3.0,
+    "validation_folds": 2,
+    "workspace": "results/unused",
+    "mix_concentration": 40,
+    "jitter": 0.25,
+}
+
+
 def et(y: int, mo: int, d: int, h: int, mi: int) -> datetime:
     return datetime(y, mo, d, h, mi, tzinfo=ET)
 
@@ -118,6 +135,7 @@ def write_config(
     splits: dict[str, object] | None = None,
     critics: dict[str, object] | None = None,
     search: dict[str, object] | None = None,
+    meta: dict[str, object] | None = None,
 ) -> Path:
     cfg = {
         "seed": 1,
@@ -154,6 +172,7 @@ def write_config(
         "evaluator": EVALUATOR_CFG | {"results_db": str(tmp / "results.duckdb")},
         "critics": critics or CRITICS_CFG,
         "search": search or SEARCH_CFG,
+        "meta": meta or META_CFG | {"workspace": str(tmp / "tournaments")},
     }
     path = tmp / "config.yaml"
     path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
